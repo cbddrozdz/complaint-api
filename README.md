@@ -168,5 +168,3 @@ To run the application locally using Docker:
 - All necessary database changes will be applied automatically using Liquibase on application startup.
 - Ensure that Docker Desktop or Docker Engine is running before executing the `docker-compose up` command.
 - For local development without Docker, consider using the `application-dev.yml` profile, which connects to a locally hosted PostgreSQL instance.
-
-```

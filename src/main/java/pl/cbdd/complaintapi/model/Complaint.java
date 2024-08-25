@@ -1,16 +1,15 @@
 package pl.cbdd.complaintapi.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.sql.Timestamp;
 import java.util.UUID;
 
+@Builder
 @Entity
 @Table(name = "complaints")
 @EntityListeners(AuditingEntityListener.class)
@@ -25,6 +24,10 @@ public class Complaint {
     @Column(name = "id", unique = true, nullable = false)
     private UUID id;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Column(name = "product_id", nullable = false)
     private String productId;
 
@@ -34,6 +37,10 @@ public class Complaint {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
+
+    @LastModifiedDate
+    @Column(name = "modified_at", nullable = false)
+    private Timestamp modifiedAt;
 
     @Column(name = "reporter", nullable = false)
     private String reporter;

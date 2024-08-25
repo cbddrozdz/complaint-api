@@ -18,4 +18,20 @@
         </createTable>
     </changeSet>
 
+    <changeSet id="2024-08-25-add-version-column" author="dawid drozdz">
+        <addColumn tableName="complaints">
+            <column name="version" type="BIGINT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="add-modified-at-to-complaints" author="dawid drozdz">
+        <addColumn tableName="complaints">
+            <column name="modified_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

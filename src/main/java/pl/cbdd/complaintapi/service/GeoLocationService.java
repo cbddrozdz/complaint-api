@@ -3,19 +3,17 @@ package pl.cbdd.complaintapi.service;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
+@RequiredArgsConstructor
 public class GeoLocationService {
 
     private final RestTemplate restTemplate;
-
-    public GeoLocationService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
 
     @CircuitBreaker(name = "geoLocationService", fallbackMethod = "fallbackCountry")
     @Retry(name = "geoLocationServiceRetry")

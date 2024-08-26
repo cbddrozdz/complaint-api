@@ -3,23 +3,21 @@ package pl.cbdd.complaintapi.service;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import pl.cbdd.complaintapi.dto.ComplaintRequest;
 import pl.cbdd.complaintapi.dto.ComplaintResponse;
 import pl.cbdd.complaintapi.dto.UpdateComplaintRequest;
 import pl.cbdd.complaintapi.exception.ComplaintCreationException;
 import pl.cbdd.complaintapi.exception.ComplaintNotFoundException;
-import pl.cbdd.complaintapi.exception.ComplaintUpdateException;
 import pl.cbdd.complaintapi.model.Complaint;
 import pl.cbdd.complaintapi.repository.ComplaintRepository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Transactional
@@ -30,27 +28,33 @@ public class ComplaintServiceImpl implements ComplaintService {
     private final ModelMapper modelMapper;
 
     @Override
+    @Transactional
     public ComplaintResponse addComplaint(ComplaintRequest complaintRequest) {
         try {
-            Optional<Complaint> existingComplaintOpt = complaintRepository
-                    .findByProductIdAndReporter(complaintRequest.getProductId(), complaintRequest.getReporter());
+            Complaint complaint = new Complaint();
+            AtomicReference<ComplaintResponse> complaintResponseAtomic = new AtomicReference<>();
+            complaintRepository
+                    .findByProductIdAndReporter(complaintRequest.getProductId(), complaintRequest.getReporter())
+                    .ifPresentOrElse(comp -> {
+                                complaintRepository.findById(comp.getId())
+                                        .orElseThrow(() -> new ComplaintNotFoundException("Complaint not found with id: " + comp.getId()));
 
-            Complaint complaint;
-            if (existingComplaintOpt.isPresent()) {
-                complaint = complaintRepository.findAndLockById(existingComplaintOpt.get().getId());
-                complaint.setReportCount(complaint.getReportCount() + 1);
-                complaintRepository.save(complaint);
-            } else {
-                complaint = new Complaint();
-                complaint.setProductId(complaintRequest.getProductId());
-                complaint.setContent(complaintRequest.getContent());
-                complaint.setCreatedAt(Timestamp.from(Instant.now()));
-                complaint.setReporter(complaintRequest.getReporter());
-                complaint.setCountry(complaintRequest.getCountry());
-                complaint.setReportCount(1);
-                complaintRepository.save(complaint);
-            }
-            return modelMapper.map(complaint, ComplaintResponse.class);
+                                comp.setReportCount(comp.getReportCount() + 1);
+                                complaintRepository.save(comp);
+                                complaintResponseAtomic.set(modelMapper.map(comp, ComplaintResponse.class));
+                            }, () -> {
+                                complaint.setProductId(complaintRequest.getProductId());
+                                complaint.setContent(complaintRequest.getContent());
+                                complaint.setCreatedAt(Timestamp.from(Instant.now()));
+                                complaint.setReporter(complaintRequest.getReporter());
+                                complaint.setCountry(complaintRequest.getCountry());
+                                complaint.setReportCount(1);
+                                complaintRepository.save(complaint);
+                                complaintResponseAtomic.set(modelMapper.map(complaint, ComplaintResponse.class));
+                            }
+                    );
+
+            return complaintResponseAtomic.get();
         } catch (Exception e) {
             throw new ComplaintCreationException("Failed to add complaint: " + e.getMessage(), e);
         }
@@ -58,44 +62,28 @@ public class ComplaintServiceImpl implements ComplaintService {
 
     @Override
     public ComplaintResponse getComplaint(UUID id) {
-        try {
-            Complaint complaint = complaintRepository.findById(id)
-                    .orElseThrow(() -> new ComplaintNotFoundException("Complaint not found with id: " + id));
-            return modelMapper.map(complaint, ComplaintResponse.class);
-        } catch (ComplaintNotFoundException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get complaint: " + e.getMessage(), e);
-        }
+        Complaint complaint = complaintRepository.findById(id)
+                .orElseThrow(() -> new ComplaintNotFoundException("Complaint not found with id: " + id));
+        return modelMapper.map(complaint, ComplaintResponse.class);
     }
 
     @Override
-    public List<ComplaintResponse> getAllComplaints(int page, int size) {
-        try {
-            return complaintRepository.findAll(PageRequest.of(page, size)).stream()
-                    .map(complaint -> modelMapper.map(complaint, ComplaintResponse.class))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get all complaints: " + e.getMessage(), e);
-        }
+    public Page<ComplaintResponse> getAllComplaints(Pageable pageable) {
+        return complaintRepository.findAll(pageable)
+                .map(complaint -> modelMapper.map(complaint, ComplaintResponse.class));
     }
 
     @Override
-    public ComplaintResponse updateComplaint(UUID id, UpdateComplaintRequest updateComplaintRequest) {
-        try {
-            Complaint complaint = complaintRepository.findAndLockById(id);
-            if (complaint == null) {
-                throw new ComplaintNotFoundException("Complaint not found with id: " + id);
-            }
+    @Transactional
+    public ComplaintResponse updateComplaint(UpdateComplaintRequest updateComplaintRequest) {
+        Complaint complaint = complaintRepository.findById(UUID.fromString(updateComplaintRequest.getId()))
+                .orElseThrow(() -> new ComplaintNotFoundException("Complaint not found with id: " + updateComplaintRequest.getId()));
 
+        if (updateComplaintRequest.getContent() != null) {
             complaint.setContent(updateComplaintRequest.getContent());
             complaintRepository.save(complaint);
-
-            return modelMapper.map(complaint, ComplaintResponse.class);
-        } catch (ComplaintNotFoundException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ComplaintUpdateException("Failed to update complaint: " + e.getMessage(), e);
         }
+
+        return modelMapper.map(complaint, ComplaintResponse.class);
     }
 }

@@ -10,12 +10,16 @@ import org.springframework.web.client.RestTemplate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 class GeoLocationServiceTest {
 
     @Mock
     private RestTemplate restTemplate;
+
+    @Mock
+    private GeoLocationResponse geoLocationResponse;
 
     @InjectMocks
     private GeoLocationService geoLocationService;
@@ -27,10 +31,8 @@ class GeoLocationServiceTest {
 
     @Test
     void shouldReturnCountryWhenIpIsValid() {
-
-        GeoLocationResponse response = new GeoLocationResponse();
-        response.setCountry("Poland");
-        when(restTemplate.getForObject(anyString(), eq(GeoLocationResponse.class))).thenReturn(response);
+        doReturn("Poland").when(geoLocationResponse).getCountry();
+        when(restTemplate.getForObject(anyString(), eq(GeoLocationResponse.class))).thenReturn(geoLocationResponse);
 
         String country = geoLocationService.getCountryByIp("127.0.0.1");
 
@@ -39,9 +41,8 @@ class GeoLocationServiceTest {
 
     @Test
     void shouldReturnUnknownWhenNoCountryInResponse() {
-        GeoLocationResponse response = new GeoLocationResponse();
-        response.setCountry(null);
-        when(restTemplate.getForObject(anyString(), eq(GeoLocationResponse.class))).thenReturn(response);
+        doReturn(null).when(geoLocationResponse).getCountry();
+        when(restTemplate.getForObject(anyString(), eq(GeoLocationResponse.class))).thenReturn(geoLocationResponse);
 
         String country = geoLocationService.getCountryByIp("127.0.0.1");
 
@@ -50,7 +51,6 @@ class GeoLocationServiceTest {
 
     @Test
     void shouldReturnFallbackCountryWhenRestTemplateFails() {
-
         when(restTemplate.getForObject(anyString(), eq(GeoLocationResponse.class)))
                 .thenThrow(new RuntimeException("API failure"));
 

@@ -5,14 +5,9 @@ import lombok.*;
 import java.sql.Timestamp;
 import java.util.UUID;
 
-@Builder
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 @Getter
 @Setter
 public class ComplaintResponse {
-
     private UUID id;
     private String productId;
     private String content;

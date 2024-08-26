@@ -11,5 +11,4 @@ class ComplaintApiApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

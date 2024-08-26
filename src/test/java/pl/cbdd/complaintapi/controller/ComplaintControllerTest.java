@@ -1,57 +1,58 @@
 package pl.cbdd.complaintapi.controller;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import pl.cbdd.complaintapi.dto.ComplaintRequest;
 import pl.cbdd.complaintapi.dto.ComplaintResponse;
-import pl.cbdd.complaintapi.dto.UpdateComplaintRequest;
 import pl.cbdd.complaintapi.service.ComplaintService;
 import pl.cbdd.complaintapi.service.GeoLocationService;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WebMvcTest(ComplaintController.class)
 class ComplaintControllerTest {
 
+    @Autowired
     private MockMvc mockMvc;
 
     @Mock
+    private ComplaintResponse complaintResponse;
+
+    @MockBean
     private ComplaintService complaintService;
 
-    @Mock
+    @MockBean
     private GeoLocationService geoLocationService;
-
-    @InjectMocks
-    private ComplaintController complaintController;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        mockMvc = MockMvcBuilders.standaloneSetup(complaintController).build();
-    }
 
     @Test
     void addComplaint_ShouldReturnComplaintResponse() throws Exception {
 
-        ComplaintRequest complaintRequest = new ComplaintRequest();
-        complaintRequest.setCountry("Poland");
+        ComplaintRequest complaintRequest = Mockito.mock(ComplaintRequest.class);
+        doReturn("Poland").when(complaintRequest).getCountry();
 
-        ComplaintResponse complaintResponse = new ComplaintResponse();
-        complaintResponse.setId(UUID.randomUUID());
-        complaintResponse.setCountry("Poland");
+        ComplaintResponse complaintResponse = Mockito.mock(ComplaintResponse.class);
+        doReturn(UUID.randomUUID()).when(complaintResponse).getId();
+        doReturn("Poland").when(complaintResponse).getCountry();
 
         when(geoLocationService.getCountryByIp(anyString())).thenReturn("Poland");
         when(complaintService.addComplaint(any(ComplaintRequest.class))).thenReturn(complaintResponse);
@@ -68,13 +69,12 @@ class ComplaintControllerTest {
     void getComplaint_ShouldReturnComplaintResponse() throws Exception {
 
         UUID id = UUID.randomUUID();
-        ComplaintResponse complaintResponse = new ComplaintResponse();
-        complaintResponse.setId(id);
-        complaintResponse.setCountry("Poland");
+        ComplaintResponse complaintResponse = Mockito.mock(ComplaintResponse.class);
+        doReturn(id).when(complaintResponse).getId();
+        doReturn("Poland").when(complaintResponse).getCountry();
 
         when(complaintService.getComplaint(id)).thenReturn(complaintResponse);
 
-        // When & Then
         mockMvc.perform(get("/api/v1/complaints/{id}", id.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
@@ -84,39 +84,44 @@ class ComplaintControllerTest {
     @Test
     void getAllComplaints_ShouldReturnListOfComplaints() throws Exception {
 
-        ComplaintResponse complaintResponse = new ComplaintResponse();
-        complaintResponse.setId(UUID.randomUUID());
-        complaintResponse.setCountry("Poland");
+        ComplaintResponse complaintResponse = Mockito.mock(ComplaintResponse.class);
+        doReturn(UUID.fromString("c732cd78-572c-4059-bd62-61b9f5ed9251")).when(complaintResponse).getId();
+        doReturn("Poland").when(complaintResponse).getCountry();
+        doReturn(1).when(complaintResponse).getReportCount();
 
-        List<ComplaintResponse> complaints = Collections.singletonList(complaintResponse);
+        Page<ComplaintResponse> complaints = new PageImpl<>(Collections.singletonList(complaintResponse), PageRequest.of(0, 10), 1);
 
-        when(complaintService.getAllComplaints(0, 10)).thenReturn(complaints);
+        when(complaintService.getAllComplaints(any(Pageable.class))).thenReturn(complaints);
 
-        mockMvc.perform(get("/api/v1/complaints/all")
-                        .param("page", "0")
-                        .param("size", "10"))
+        mockMvc.perform(get("/api/v1/complaints/all"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").exists())
-                .andExpect(jsonPath("$[0].country").value("Poland"));
+                .andExpect(MockMvcResultMatchers.content().json("{\"content\":[{\"id\":\"c732cd78-572c-4059-bd62-61b9f5ed9251\"," +
+                        "\"productId\":null,\"content\":null,\"createdAt\":null,\"reporter\":null,\"country\":\"Poland\"," +
+                        "\"reportCount\":1}],\"pageable\":{\"pageNumber\":0,\"pageSize\":10,\"sort\":{\"empty\":true," +
+                        "\"unsorted\":true,\"sorted\":false},\"offset\":0,\"paged\":true,\"unpaged\":false}," +
+                        "\"last\":true,\"totalElements\":1,\"totalPages\":1,\"first\":true," +
+                        "\"size\":10,\"number\":0,\"sort\":{\"empty\":true,\"unsorted\":true," +
+                        "\"sorted\":false},\"numberOfElements\":1,\"empty\":false}"));
     }
 
     @Test
     void updateComplaint_ShouldReturnUpdatedComplaintResponse() throws Exception {
 
         UUID id = UUID.randomUUID();
-        UpdateComplaintRequest updateComplaintRequest = new UpdateComplaintRequest();
-        updateComplaintRequest.setContent("new content");
 
-        ComplaintResponse complaintResponse = new ComplaintResponse();
-        complaintResponse.setId(id);
-        complaintResponse.setContent("new content");
-        complaintResponse.setCountry("Poland");
+        doReturn(id).when(complaintResponse).getId();
+        doReturn("new content").when(complaintResponse).getContent();
+        doReturn("Poland").when(complaintResponse).getCountry();
+        doReturn(complaintResponse).when(complaintService).updateComplaint(any());
 
-        when(complaintService.updateComplaint(eq(id), any(UpdateComplaintRequest.class))).thenReturn(complaintResponse);
-
-        mockMvc.perform(put("/api/v1/complaints/{id}", id.toString())
+        mockMvc.perform(put("/api/v1/complaints")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"content\":\"new content\"}"))
+                        .content("""
+                                {
+                                    "id": "123",
+                                    "content": "new content"
+                                }
+                                """))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))

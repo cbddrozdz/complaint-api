@@ -84,7 +84,7 @@ The service uses Resilience4j to add fault tolerance when communicating with the
 - **Circuit Breaker**: Protects the service from external API failures by stopping further requests to the API when failures are detected.
 - **Retry**: Automatically retries failed requests to the external API before triggering the circuit breaker.
 
-These configurations are specified in the `application.yml` file:
+These configurations are specified in the `application.yaml` file:
 
 ```yaml
 resilience4j:
@@ -164,7 +164,7 @@ To run the application locally using Docker:
 
 ### Notes
 
-- The `application.yml` is configured to use the database connection provided by the Docker container.
+- The `application.yaml` is configured to use the database connection provided by the Docker container.
 - All necessary database changes will be applied automatically using Liquibase on application startup.
 - Ensure that Docker Desktop or Docker Engine is running before executing the `docker-compose up` command.
-- For local development without Docker, consider using the `application-dev.yml` profile, which connects to a locally hosted PostgreSQL instance.
+- For local development without Docker, consider using the `application-dev.yaml` profile, which connects to a locally hosted PostgreSQL instance.

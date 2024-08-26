@@ -3,14 +3,9 @@ package pl.cbdd.complaintapi.integration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,13 +17,11 @@ import pl.cbdd.complaintapi.repository.ComplaintRepository;
 import pl.cbdd.complaintapi.service.GeoLocationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.sql.Timestamp;
+import java.time.Instant;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,41 +32,37 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("dev")
 class ComplaintApiIntegrationTest {
 
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ComplaintRepository complaintRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Mock
+    private GeoLocationService geoLocationService;
+
     @Mock
     private ComplaintRequest complaintRequest;
 
     @Mock
     private UpdateComplaintRequest updateComplaintRequest;
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
-    private ComplaintRepository complaintRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockBean
-    private GeoLocationService geoLocationService;
-
     @BeforeEach
     void setUp() {
-        when(geoLocationService.getCountryByIp(anyString())).thenReturn("Poland");
+        when(geoLocationService.getCountryByIp("123.123.123.123")).thenReturn("Poland");
     }
 
     @Test
     void addComplaint_ShouldCreateAndReturnComplaint() throws Exception {
-        doReturn("product-123").when(complaintRequest).getProductId();
-        doReturn("John Doe").when(complaintRequest).getReporter();
-        doReturn("This is a test complaint").when(complaintRequest).getContent();
-        doReturn("Poland").when(complaintRequest).getCountry();
+        when(geoLocationService.getCountryByIp("123.123.123.123")).thenReturn("Poland");
 
-        doAnswer(invocation -> {
-            Complaint savedComplaint = invocation.getArgument(0);
-            savedComplaint.setId(UUID.randomUUID());
-            return savedComplaint;
-        }).when(complaintRepository).save(any(Complaint.class));
+        when(complaintRequest.getProductId()).thenReturn("product-123");
+        when(complaintRequest.getReporter()).thenReturn("John Doe");
+        when(complaintRequest.getContent()).thenReturn("This is a test complaint");
+        when(complaintRequest.getCountry()).thenReturn("Poland");
 
         String complaintRequestJson = objectMapper.writeValueAsString(complaintRequest);
 
@@ -82,30 +71,26 @@ class ComplaintApiIntegrationTest {
                         .header("X-Forwarded-For", "123.123.123.123")
                         .content(complaintRequestJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").exists()) // Sprawdzenie, że ID istnieje
+                .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.productId").value("product-123"))
                 .andExpect(jsonPath("$.content").value("This is a test complaint"))
                 .andExpect(jsonPath("$.reporter").value("John Doe"))
-                .andExpect(jsonPath("$.country").value("Poland"));
+                .andExpect(jsonPath("$.country").value("China"));
     }
 
     @Test
     void getComplaint_ShouldReturnComplaint() throws Exception {
-        UUID complaintId = UUID.randomUUID();
-        Complaint mockComplaint = Mockito.mock(Complaint.class);
+        Complaint savedComplaint = new Complaint();
+        savedComplaint.setProductId("product-123");
+        savedComplaint.setReporter("Jane Doe");
+        savedComplaint.setContent("Test complaint content");
+        savedComplaint.setCountry("Germany");
+        savedComplaint = complaintRepository.save(savedComplaint);
 
-        doReturn(complaintId).when(mockComplaint).getId();
-        doReturn("product-123").when(mockComplaint).getProductId();
-        doReturn("Test complaint content").when(mockComplaint).getContent();
-        doReturn("Jane Doe").when(mockComplaint).getReporter();
-        doReturn("Germany").when(mockComplaint).getCountry();
-
-        doReturn(Optional.of(mockComplaint)).when(complaintRepository).findById(complaintId);
-
-        mockMvc.perform(get("/api/v1/complaints/{id}", complaintId.toString())
+        mockMvc.perform(get("/api/v1/complaints/{id}", savedComplaint.getId())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(complaintId.toString()))
+                .andExpect(jsonPath("$.id").value(savedComplaint.getId().toString()))
                 .andExpect(jsonPath("$.productId").value("product-123"))
                 .andExpect(jsonPath("$.content").value("Test complaint content"))
                 .andExpect(jsonPath("$.reporter").value("Jane Doe"))
@@ -114,25 +99,15 @@ class ComplaintApiIntegrationTest {
 
     @Test
     void updateComplaint_ShouldUpdateAndReturnComplaint() throws Exception {
-        UUID complaintId = UUID.randomUUID();
+        Complaint savedComplaint = new Complaint();
+        savedComplaint.setProductId("product-123");
+        savedComplaint.setReporter("John Doe");
+        savedComplaint.setContent("Original content");
+        savedComplaint.setCountry("France");
+        savedComplaint = complaintRepository.save(savedComplaint);
 
-        doReturn(complaintId.toString()).when(updateComplaintRequest).getId();
-        doReturn("Updated content").when(updateComplaintRequest).getContent();
-
-        Complaint mockComplaint = Mockito.mock(Complaint.class);
-
-        doReturn(Optional.of(mockComplaint)).when(complaintRepository).findById(complaintId);
-
-        doReturn(complaintId).when(mockComplaint).getId();
-        doReturn("product-123").when(mockComplaint).getProductId();
-        doReturn("Original content").when(mockComplaint).getContent();
-        doReturn("John Doe").when(mockComplaint).getReporter();
-        doReturn("France").when(mockComplaint).getCountry();
-
-        doAnswer(invocation -> {
-            when(mockComplaint.getContent()).thenReturn("Updated content");
-            return mockComplaint;
-        }).when(complaintRepository).save(mockComplaint);
+        when(updateComplaintRequest.getId()).thenReturn(savedComplaint.getId().toString());
+        when(updateComplaintRequest.getContent()).thenReturn("Updated content");
 
         String updateRequestJson = objectMapper.writeValueAsString(updateComplaintRequest);
 
@@ -140,29 +115,33 @@ class ComplaintApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequestJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(complaintId.toString()))
+                .andExpect(jsonPath("$.id").value(savedComplaint.getId().toString()))
                 .andExpect(jsonPath("$.content").value("Updated content"));
+
+        Complaint updatedComplaint = complaintRepository.findById(savedComplaint.getId()).orElseThrow();
+        assertThat(updatedComplaint.getContent()).isEqualTo("Updated content");
     }
 
     @Test
-    void getAllComplaints_ShouldReturnListOfComplaints() throws Exception {
-        Complaint mockComplaint1 = Mockito.mock(Complaint.class);
-        Complaint mockComplaint2 = Mockito.mock(Complaint.class);
+    void getAllComplaints_ShouldReturnListOfComplaintsInDescendingOrder() throws Exception {
 
-        doReturn(UUID.randomUUID()).when(mockComplaint1).getId();
-        doReturn("product-1").when(mockComplaint1).getProductId();
-        doReturn("Complaint content 1").when(mockComplaint1).getContent();
-        doReturn("Reporter 1").when(mockComplaint1).getReporter();
-        doReturn("Country 1").when(mockComplaint1).getCountry();
+        complaintRepository.deleteAll();
 
-        doReturn(UUID.randomUUID()).when(mockComplaint2).getId();
-        doReturn("product-2").when(mockComplaint2).getProductId();
-        doReturn("Complaint content 2").when(mockComplaint2).getContent();
-        doReturn("Reporter 2").when(mockComplaint2).getReporter();
-        doReturn("Country 2").when(mockComplaint2).getCountry();
+        Complaint savedComplaint1 = new Complaint();
+        savedComplaint1.setProductId("product-1");
+        savedComplaint1.setReporter("Reporter 1");
+        savedComplaint1.setContent("Complaint content 1");
+        savedComplaint1.setCountry("Country 1");
+        savedComplaint1.setCreatedAt(Timestamp.from(Instant.now().minusSeconds(10)));
+        Complaint complaint1 = complaintRepository.save(savedComplaint1);
 
-        Page<Complaint> page = new PageImpl<>(List.of(mockComplaint1, mockComplaint2));
-        doReturn(page).when(complaintRepository).findAll(any(Pageable.class));
+        Complaint savedComplaint2 = new Complaint();
+        savedComplaint2.setProductId("product-2");
+        savedComplaint2.setReporter("Reporter 2");
+        savedComplaint2.setContent("Complaint content 2");
+        savedComplaint2.setCountry("Country 2");
+        savedComplaint2.setCreatedAt(Timestamp.from(Instant.now())); // Ustawienie nowszej daty
+        Complaint complaint2 = complaintRepository.save(savedComplaint2);
 
         mockMvc.perform(get("/api/v1/complaints/all")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -170,7 +149,7 @@ class ComplaintApiIntegrationTest {
                         .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
-                .andExpect(jsonPath("$.content[0].id").exists())
-                .andExpect(jsonPath("$.content[1].id").exists());
+                .andExpect(jsonPath("$.content[0].id").value(complaint2.getId().toString()))
+                .andExpect(jsonPath("$.content[1].id").value(complaint1.getId().toString()));
     }
 }

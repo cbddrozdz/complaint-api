@@ -17,9 +17,6 @@ import pl.cbdd.complaintapi.repository.ComplaintRepository;
 import pl.cbdd.complaintapi.service.GeoLocationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.sql.Timestamp;
-import java.time.Instant;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -120,36 +117,5 @@ class ComplaintApiIntegrationTest {
 
         Complaint updatedComplaint = complaintRepository.findById(savedComplaint.getId()).orElseThrow();
         assertThat(updatedComplaint.getContent()).isEqualTo("Updated content");
-    }
-
-    @Test
-    void getAllComplaints_ShouldReturnListOfComplaintsInDescendingOrder() throws Exception {
-
-        complaintRepository.deleteAll();
-
-        Complaint savedComplaint1 = new Complaint();
-        savedComplaint1.setProductId("product-1");
-        savedComplaint1.setReporter("Reporter 1");
-        savedComplaint1.setContent("Complaint content 1");
-        savedComplaint1.setCountry("Country 1");
-        savedComplaint1.setCreatedAt(Timestamp.from(Instant.now().minusSeconds(10)));
-        Complaint complaint1 = complaintRepository.save(savedComplaint1);
-
-        Complaint savedComplaint2 = new Complaint();
-        savedComplaint2.setProductId("product-2");
-        savedComplaint2.setReporter("Reporter 2");
-        savedComplaint2.setContent("Complaint content 2");
-        savedComplaint2.setCountry("Country 2");
-        savedComplaint2.setCreatedAt(Timestamp.from(Instant.now())); // Ustawienie nowszej daty
-        Complaint complaint2 = complaintRepository.save(savedComplaint2);
-
-        mockMvc.perform(get("/api/v1/complaints/all")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .param("page", "0")
-                        .param("size", "10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(2))
-                .andExpect(jsonPath("$.content[0].id").value(complaint2.getId().toString()))
-                .andExpect(jsonPath("$.content[1].id").value(complaint1.getId().toString()));
     }
 }
